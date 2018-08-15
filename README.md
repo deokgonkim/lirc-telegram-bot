@@ -51,11 +51,20 @@ vi /etc/lirc/lirc_options.conf
 following my own blog https://www.dgkim.net/wordpress/2017/08/24/telegram-bot-%ed%85%8c%ec%8a%a4%ed%8a%b8-%eb%85%b8%ed%8a%b8/
 
 ### python-telegram-bot
+> I tried 
+```
 git clone https://github.com/python-telegram-bot/python-telegram-bot
 
 cd python-telegram-bot
 git submodule update
+```
 
-### dependencies for python-telegram-bot
+> But, today I changed plan.
+> https://pypi.org/project/python-telegram-bot/
 
-pip install html
+## programming part
+
+> I referenced https://github.com/python-telegram-bot/python-telegram-bot/tree/master/examples
+
+> quickly created firstbot.py
+
