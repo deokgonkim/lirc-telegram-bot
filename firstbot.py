@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import functools
+
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 
@@ -15,29 +20,75 @@ def irsend(device, key):
         result = str(e)
     return result.strip()
 
-def acOn(bot, update):
-    logging.info('I got command %s - %s' % (update.update_id, update.message.text))
-    result = irsend('LG_AC', 'AC_ON')
-    if len(result) == 0:
-        update.message.reply_text('I pressed AC_ON button on LG_AC...')
-    else:
-        update.message.reply_text('I pressed AC_ON button on LG_AC... got error - %s' % result)
 
-def acOff(bot, update):
-    logging.info('I got command %s - %s' % (update.update_id, update.message.text))
-    result = irsend('LG_AC', 'AC_OFF')
-    if len(result) == 0:
-        update.message.reply_text('I pressed AC_OFF button on LG_AC...')
-    else:
-        update.message.reply_text('I pressed AC_OFF button on LG_AC... got error - %s' % result)
+COMMANDS = []
 
-def dehumLow(bot, update):
-    logging.info('I got command %s - %s' % (update.update_id, update.message.text))
-    result = irsend('LG_AC', 'AC_dehum')
-    if len(result) == 0:
-        update.message.reply_text('I pressed AC_ON button on LG_AC...')
-    else:
-        update.message.reply_text('I pressed AC_ON button on LG_AC... got error - %s' % result)
+
+def IrCommand(fn):
+    d = dict()
+    d['name'] = fn.__name__
+    d['desc'] = fn.__doc__
+
+    @functools.wraps(fn)
+    def wrapped_fn(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    d['fn'] = wrapped_fn
+    COMMANDS.append(d)
+
+    return wrapped_fn
+
+
+class LG_AC(object):
+    device = 'lgac.conf'
+
+    @IrCommand
+    def ac_on(self, bot, update):
+        """AC Power On"""
+        return self.cmd('power-on', bot, update)
+
+    @IrCommand
+    def ac_off(self, bot, update):
+        """AC Power Off"""
+        return self.cmd('power-off', bot, update)
+
+    @IrCommand
+    def ac_temp18(self, bot, update):
+        """AC Temperature 18"""
+        return self.cmd('temperature-18', bot, update)
+
+    @IrCommand
+    def ac_temp26(self, bot, update):
+        """AC Temperature 26"""
+        return self.cmd('temperature-26', bot, update)
+
+    @IrCommand
+    def ac_jeton(self, bot, update):
+        """AC Jet On"""
+        return self.cmd('jet-on', bot, update)
+
+    @IrCommand
+    def ac_jetoff(self, bot, update):
+        """AC Jet Off"""
+        return self.cmd('jet-off', bot, update)
+
+    def cmd(self, key, bot, update):
+        logging.info('I got command {update_id} - {message.text}'.format(
+                     update_id=update.update_id,
+                     message=update.message))
+        result = irsend(self.device, key)
+        if len(result) == 0:
+            msg = 'I pressed {key} button on {device}...'
+            update.message.reply_text(msg.format(key=key, device=self.device))
+        else:
+            msg = 'I pressed {key} button on {device}... - error {result}'
+            update.message.reply_text(msg.format(key=key, device=self.device, result=result))
+        update.message.reply_text('''Additional commands.
+{}
+/help : For more help.
+'''.format('\n'.join([ '{} : {}'.format('/' + item['name'], item['desc']) for item in COMMANDS])))
+        return result
+
 
 def tvPower(bot, update):
     logging.info('I got command %s - %s' % (update.update_id, update.message.text))
@@ -50,13 +101,14 @@ def tvPower(bot, update):
 
 def help(bot, update):
     logging.info('I got command %s - %s' % (update.update_id, update.message.text))
-    update.message.reply_text('''Here is help!
-/help   : This message
-/tvpower: Turn on/off television.
-/ac_on  : Airconditioner ON
-/ac_off : Airconditioner OFF
-/dehum  : Dehum LOW
-''')
+
+    help_msg = '''Here is help!
+/help : This message
+/tvpower : Turn on/off television.
+'''
+    help_msg += '\n'.join([ '/{} : {}'.format(item['name'], item['desc']) for item in COMMANDS])
+
+    update.message.reply_text(help_msg)
 
 
 def echo(bot, update):
@@ -76,12 +128,19 @@ def main(token):
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
+    ac = LG_AC()
+
+    dp.add_handler(CommandHandler("help", help))
+
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("tvpower", tvPower))
-    dp.add_handler(CommandHandler("ac_on", acOn))
-    dp.add_handler(CommandHandler("ac_off", acOff))
-    dp.add_handler(CommandHandler("dehum", dehumLow))
-    dp.add_handler(CommandHandler("help", help))
+
+    for item in COMMANDS:
+        #def fn(*args, **kwargs):
+        #    getattr(ac, item['name']).__call__(ac, *args, **kwargs)
+        #dp.add_handler(CommandHandler(item['name'], fn))
+        #dp.add_handler(CommandHandler(item['name'], item['fn']))
+        dp.add_handler(CommandHandler(item['name'], getattr(ac, item['name'])))
 
     # on noncommand i.e message - echo the message on Telegram
     dp.add_handler(MessageHandler(Filters.text, echo))
